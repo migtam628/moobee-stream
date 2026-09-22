@@ -1,0 +1,53 @@
+server {
+  listen 80;
+  server_name _;
+  client_max_body_size 20g;
+
+  add_header X-Content-Type-Options nosniff always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+  location /api/ {
+    proxy_pass http://api:3000/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_request_buffering off;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+  }
+
+  location /media/posters/ {
+    alias /srv/moobee-stream/storage/posters/;
+    expires 30d;
+    add_header Cache-Control "public, max-age=2592000, immutable";
+  }
+
+  # Signed HLS path:
+  # /hls/<video-id>/<unix-expiry>/<md5-base64url-token>/<asset>
+  location ~ ^/hls/(?<video_id>[A-Za-z0-9-]+)/(?<expires>[0-9]+)/(?<token>[A-Za-z0-9_-]+)/(?<asset>.+)$ {
+    secure_link $token,$expires;
+    secure_link_md5 "$expires$video_id ${STREAM_SIGNING_SECRET}";
+
+    if ($secure_link = "") { return 403; }
+    if ($secure_link = "0") { return 410; }
+
+    alias /srv/moobee-stream/storage/videos/$video_id/$asset;
+    types {
+      application/vnd.apple.mpegurl m3u8;
+      video/mp2t ts;
+    }
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cache-Control "private, max-age=30" always;
+  }
+
+  location / {
+    proxy_pass http://player:80;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}

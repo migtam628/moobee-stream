@@ -1,0 +1,16 @@
+{
+  "name": "moobee-stream",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted HLS video ingest, transcoding, signed streaming, and iframe player service.",
+  "scripts": {
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:player": "npm --prefix apps/player run dev",
+    "dev:worker": "npm --prefix services/transcoder run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix services/transcoder run build && npm --prefix apps/player run build",
+    "typecheck": "npm --prefix apps/api run typecheck && npm --prefix services/transcoder run typecheck && npm --prefix apps/player run typecheck"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+node_modules
+**/node_modules
+**/dist
+storage/uploads/*
+storage/videos/*
+storage/posters/*
+*.log
+.DS_Store
