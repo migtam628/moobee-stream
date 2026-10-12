@@ -7,7 +7,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { config } from './config.js';
 import { db, type VideoRow } from './db.js';
-import { requireAdmin } from './auth.js';
+import { requireAdmin, requireService } from './auth.js';
 import { transcodeQueue } from './queue.js';
 import { createSignedStreamPath } from './signer.js';
 
@@ -41,7 +41,7 @@ app.get<{ Params: { id: string } }>('/v1/videos/:id', { preHandler: requireAdmin
   return result.rows[0];
 });
 
-app.get<{ Params: { id: string } }>('/v1/videos/:id/playback', async (request, reply) => {
+app.get<{ Params: { id: string } }>('/v1/videos/:id/playback', { preHandler: requireService }, async (request, reply) => {
   const result = await db.query<VideoRow>(
     `SELECT * FROM videos WHERE (id = $1 OR slug = $1) AND status = 'ready' LIMIT 1`,
     [request.params.id]
@@ -50,6 +50,7 @@ app.get<{ Params: { id: string } }>('/v1/videos/:id/playback', async (request, r
 
   const video = result.rows[0];
   const signed = createSignedStreamPath(video.id);
+  reply.header('Cache-Control', 'private, no-store');
   return {
     id: video.id,
     slug: video.slug,
@@ -63,7 +64,7 @@ app.get<{ Params: { id: string } }>('/v1/videos/:id/playback', async (request, r
   };
 });
 
-app.get<{ Params: { tmdbId: string } }>('/v1/movie/:tmdbId', async (request, reply) => {
+app.get<{ Params: { tmdbId: string } }>('/v1/movie/:tmdbId', { preHandler: requireService }, async (request, reply) => {
   const result = await db.query<VideoRow>(
     `SELECT * FROM videos WHERE media_type = 'movie' AND tmdb_id = $1 AND status = 'ready' LIMIT 1`,
     [request.params.tmdbId]
@@ -80,6 +81,7 @@ app.get<{ Params: { tmdbId: string } }>('/v1/movie/:tmdbId', async (request, rep
 
 app.get<{ Params: { tmdbId: string; season: string; episode: string } }>(
   '/v1/tv/:tmdbId/:season/:episode',
+  { preHandler: requireService },
   async (request, reply) => {
     const season = Number(request.params.season);
     const episode = Number(request.params.episode);
@@ -104,6 +106,43 @@ app.get<{ Params: { tmdbId: string; season: string; episode: string } }>(
     };
   }
 );
+
+
+// Minimal read-only catalog for a trusted service. No source paths, API keys,
+// signing secrets, error messages or upload metadata leave this boundary.
+// UUID-ordered pagination avoids silently truncating large catalogs at 200.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function publicVideo(row: VideoRow) {
+  return {
+    id: row.id, title: row.title, mediaType: row.media_type,
+    tmdbId: row.tmdb_id, season: row.season, episode: row.episode,
+    status: row.status, durationSeconds: row.duration_seconds,
+    width: row.width, height: row.height
+  };
+}
+
+app.get<{ Querystring: { cursor?: string } }>('/v1/internal/videos',
+  { preHandler: requireService }, async (request, reply) => {
+    const cursor = request.query.cursor ?? null;
+    if (cursor && !UUID.test(cursor)) return reply.code(400).send({ error: 'Invalid cursor' });
+    const result = await db.query<VideoRow>(
+      'SELECT * FROM videos WHERE ($1::uuid IS NULL OR id > $1::uuid) ORDER BY id LIMIT 101',
+      [cursor]);
+    const hasMore = result.rows.length > 100;
+    const page = result.rows.slice(0, 100);
+    reply.header('Cache-Control', 'private, no-store');
+    return { videos: page.map(publicVideo), nextCursor: hasMore ? page[page.length - 1].id : null };
+  });
+
+app.get<{ Params: { id: string } }>('/v1/internal/videos/:id',
+  { preHandler: requireService }, async (request, reply) => {
+    if (!UUID.test(request.params.id)) return reply.code(400).send({ error: 'Invalid video UUID' });
+    const result = await db.query<VideoRow>(
+      'SELECT * FROM videos WHERE id = $1::uuid LIMIT 1', [request.params.id]);
+    if (!result.rowCount) return reply.code(404).send({ error: 'Video not found' });
+    reply.header('Cache-Control', 'private, no-store');
+    return publicVideo(result.rows[0]);
+  });
 
 app.post('/v1/admin/videos', { preHandler: requireAdmin }, async (request, reply) => {
   const parts = request.parts();
