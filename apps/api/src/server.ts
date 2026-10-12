@@ -225,7 +225,8 @@ app.delete<{ Params: { id: string } }>('/v1/admin/videos/:id', { preHandler: req
 app.setErrorHandler((error, request, reply) => {
   request.log.error(error);
   const statusCode = (error as Error & { statusCode?: number }).statusCode ?? 500;
-  reply.code(statusCode).send({ error: statusCode >= 500 ? 'Internal server error' : error.message });
+  const message = error instanceof Error ? error.message : 'Invalid request';
+  reply.code(statusCode).send({ error: statusCode >= 500 ? 'Internal server error' : message });
 });
 
 await app.listen({ host: '0.0.0.0', port: config.port });
