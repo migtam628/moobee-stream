@@ -15,7 +15,8 @@ export async function requireAdmin(request: FastifyRequest): Promise<void> {
 // Only trusted internal MooBee IPTV backends may read normalized catalog
 // metadata or request signed playback paths. Never send this key to StreamBoss.
 export async function requireService(request: FastifyRequest): Promise<void> {
-  if (!matchesApiKey(request.headers['x-service-key'], config.serviceApiKey)) {
+  if (config.serviceApiKey === config.adminApiKey ||
+      !matchesApiKey(request.headers['x-service-key'], config.serviceApiKey)) {
     throw unauthorized();
   }
 }
