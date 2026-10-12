@@ -24,9 +24,10 @@ server {
     add_header Cache-Control "public, max-age=2592000, immutable";
   }
 
+  # Restrict signed HLS assets to worker-generated master, rendition and segments.
   # Signed HLS path:
   # /hls/<video-id>/<unix-expiry>/<md5-base64url-token>/<asset>
-  location ~ ^/hls/(?<video_id>[A-Za-z0-9-]+)/(?<expires>[0-9]+)/(?<token>[A-Za-z0-9_-]+)/(?<asset>.+)$ {
+  location ~ ^/hls/(?<video_id>[A-Za-z0-9-]+)/(?<expires>[0-9]+)/(?<token>[A-Za-z0-9_-]+)/(?<asset>master\.m3u8|[A-Za-z0-9_-]+/(?:index\.m3u8|segment_[0-9]{5}\.ts))$ {
     secure_link $token,$expires;
     secure_link_md5 "$expires$video_id ${STREAM_SIGNING_SECRET}";
 
