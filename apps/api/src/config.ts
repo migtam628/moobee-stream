@@ -9,6 +9,9 @@ export const config = {
   databaseUrl: required('DATABASE_URL'),
   redisUrl: required('REDIS_URL'),
   adminApiKey: required('ADMIN_API_KEY'),
+  // Missing key fails closed for internal catalog and playback routes.
+  // Only the MooBee IPTV backend should possess this secret.
+  serviceApiKey: process.env.STREAM_SERVICE_API_KEY ?? '',
   streamSigningSecret: required('STREAM_SIGNING_SECRET'),
   streamTokenTtlSeconds: Number(process.env.STREAM_TOKEN_TTL_SECONDS ?? 7200),
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES ?? 20 * 1024 * 1024 * 1024),
