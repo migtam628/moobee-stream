@@ -1,5 +1,8 @@
 # Security notes
 
+**Private MooBee IPTV integration:** The default Nginx binding is host-loopback `127.0.0.1:8080`. Playback signing, movie/TV resolution and read-only metadata require `STREAM_SERVICE_API_KEY` (32+ bytes) through `x-service-key`, separate from `ADMIN_API_KEY`. Do not expose these endpoints, signing keys or signed HLS paths directly to StreamBoss, the browser or public Internet. A signed HLS path is a bearer credential, not a subscriber/session authorization decision. The existing embedded React player will fail to request playback until an authenticated gateway is implemented. This is intentional. See [Private Integration](PRIVATE_INTEGRATION.md).
+
+
 This starter is intended for media you own or are authorized to distribute.
 
 Before exposing the service publicly:

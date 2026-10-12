@@ -35,6 +35,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       ADMIN_API_KEY: ${ADMIN_API_KEY}
+      STREAM_SERVICE_API_KEY: ${STREAM_SERVICE_API_KEY:-}
       STREAM_SIGNING_SECRET: ${STREAM_SIGNING_SECRET}
       STREAM_TOKEN_TTL_SECONDS: ${STREAM_TOKEN_TTL_SECONDS:-7200}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-21474836480}
@@ -73,7 +74,7 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     environment:
       STREAM_SIGNING_SECRET: ${STREAM_SIGNING_SECRET}
     volumes:
