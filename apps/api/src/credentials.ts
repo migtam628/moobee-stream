@@ -1,13 +1,11 @@
 import crypto from 'node:crypto';
 
-/** Compare high-entropy service keys without leaking length/timing on match. */
+/** Compare high-entropy service keys in constant time using fixed-size hashes. */
 export function matchesApiKey(value: unknown, expected: string): boolean {
-  if (typeof value !== 'string' || expected.length < 32) return false;
-  const providedBytes = Buffer.from(value, 'utf8');
-  const expectedBytes = Buffer.from(expected, 'utf8');
-  if (providedBytes.length !== expectedBytes.length || expectedBytes.length < 32) {
-    // No equality result is possible; avoid accidental acceptance.
+  if (typeof value !== 'string' || Buffer.byteLength(expected, 'utf8') < 32) {
     return false;
   }
-  return crypto.timingSafeEqual(providedBytes, expectedBytes);
+  const actualDigest = crypto.createHash('sha256').update(value, 'utf8').digest();
+  const expectedDigest = crypto.createHash('sha256').update(expected, 'utf8').digest();
+  return crypto.timingSafeEqual(actualDigest, expectedDigest);
 }
