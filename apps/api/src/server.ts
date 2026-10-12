@@ -10,6 +10,7 @@ import { db, type VideoRow } from './db.js';
 import { requireAdmin, requireService } from './auth.js';
 import { transcodeQueue } from './queue.js';
 import { createSignedStreamPath } from './signer.js';
+import { buildVideoLookup } from './videoLookup.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 
@@ -36,16 +37,15 @@ app.get('/v1/videos', { preHandler: requireAdmin }, async () => {
 });
 
 app.get<{ Params: { id: string } }>('/v1/videos/:id', { preHandler: requireAdmin }, async (request, reply) => {
-  const result = await db.query<VideoRow>('SELECT * FROM videos WHERE id = $1 OR slug = $1 LIMIT 1', [request.params.id]);
+  const lookup = buildVideoLookup(request.params.id);
+  const result = await db.query<VideoRow>(lookup.sql, lookup.params);
   if (!result.rowCount) return reply.code(404).send({ error: 'Video not found' });
   return result.rows[0];
 });
 
 app.get<{ Params: { id: string } }>('/v1/videos/:id/playback', { preHandler: requireService }, async (request, reply) => {
-  const result = await db.query<VideoRow>(
-    `SELECT * FROM videos WHERE (id = $1 OR slug = $1) AND status = 'ready' LIMIT 1`,
-    [request.params.id]
-  );
+  const lookup = buildVideoLookup(request.params.id, true);
+  const result = await db.query<VideoRow>(lookup.sql, lookup.params);
   if (!result.rowCount) return reply.code(404).send({ error: 'Video is not ready or does not exist' });
 
   const video = result.rows[0];
