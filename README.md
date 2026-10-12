@@ -1,5 +1,9 @@
 # MooBee Stream
 
+> **MooBee platform scope:** This is the transcoding/HLS service behind **MooBee IPTV**; **StreamBoss** is the only supported playback client for the integrated platform. The bundled React iframe player is not a production auth path. See [private integration and migration notes](docs/PRIVATE_INTEGRATION.md).
+>
+> **Security phase:** Default Compose binds port 8080 on host loopback only. The playback resolver and movie/TV lookups now require a private `x-service-key` header, not a public browser call. This deliberately breaks public unauthenticated iframe embeds. Do **not** expose the key in browsers or modify the live MooBee IPTV Caddy/Tailscale configuration.
+
 Self-hosted video ingest, FFmpeg transcoding, HLS delivery, signed stream URLs, and a responsive iframe player for Ubuntu/VPS deployments.
 
 > Use this software only for video you own or are authorized to host and distribute.
@@ -150,7 +154,7 @@ curl -H "x-api-key: $ADMIN_API_KEY" \
   http://localhost:8080/api/v1/videos/<UUID>
 ```
 
-When `status` becomes `ready`, open:
+When `status` becomes `ready`, review private playback metadata using the future MooBee IPTV adapter. The standalone public iframe path is **not operational** with service-only auth. The old URL shape was:
 
 ```text
 http://YOUR_SERVER:8080/v/<UUID>
@@ -170,7 +174,7 @@ curl --fail-with-body \
   http://localhost:8080/api/v1/admin/videos
 ```
 
-After transcoding finishes:
+After transcoding finishes, media remains private; the following old iframe route is not a supported way to play without a gateway:
 
 ```text
 http://localhost:8080/movie/550
@@ -191,7 +195,7 @@ curl --fail-with-body \
   http://localhost:8080/api/v1/admin/videos
 ```
 
-Playback route:
+Former standalone iframe route (requires future gateway support):
 
 ```text
 http://localhost:8080/tv/1399/1/1
@@ -199,12 +203,12 @@ http://localhost:8080/tv/1399/1/1
 
 ## API
 
-Public endpoints:
+Endpoints (health remains unauthenticated on **loopback only**; playback/resolvers require `x-service-key`):
 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/health` | Health check |
-| `GET` | `/api/v1/videos/:id/playback` | Get short-lived signed playback path |
+| `GET` | `/api/v1/videos/:id/playback` | Private service-authenticated signed playback path |
 | `GET` | `/api/v1/movie/:tmdbId` | Resolve a movie |
 | `GET` | `/api/v1/tv/:tmdbId/:season/:episode` | Resolve a TV episode |
 
@@ -221,7 +225,7 @@ x-api-key: YOUR_ADMIN_API_KEY
 | `GET` | `/api/v1/videos/:id` | Get processing/status metadata |
 | `DELETE` | `/api/v1/admin/videos/:id` | Remove video and files |
 
-See [docs/API.md](docs/API.md).
+Service metadata endpoints require a distinct `x-service-key` (at least 32 bytes), not the upload/delete admin key. They include paginated `GET /api/v1/internal/videos` and `GET /api/v1/internal/videos/:uuid`. See [docs/API.md](docs/API.md).
 
 ## Processing states
 
@@ -288,7 +292,7 @@ Before exposing this publicly:
 2. Set `PUBLIC_EMBED_BASE_URL` to your real HTTPS embed domain.
 3. Change `CORS_ORIGIN=*` to the allowed frontend origin(s).
 4. Put TLS in front of port 8080 using your preferred reverse proxy or change the included Nginx deployment to terminate TLS directly.
-5. Keep the upload/admin route behind a VPN, zero-trust access policy, or IP allowlist.
+5. Keep upload, service metadata, signed HLS and playback private. Never expose Stream 8080 publicly until a subscriber-aware gateway exists.
 6. Set DNS for the embed domain.
 7. Monitor disk space and CPU usage.
 8. Back up PostgreSQL.
@@ -320,14 +324,14 @@ HTTPS reverse proxy :443
 MooBee Stream Nginx
 ```
 
-If another Nginx instance already owns ports 80/443 on the VPS, keep this Compose stack bound to localhost by changing:
+The Compose stack now **defaults** to host loopback; it uses:
 
 ```yaml
 ports:
   - "127.0.0.1:8080:80"
 ```
 
-and proxy your public hostname to `http://127.0.0.1:8080`.
+Do not proxy this origin publicly without implementing the subscriber authorization gateway.
 
 ## Useful commands
 
@@ -410,7 +414,7 @@ The included Compose/Nginx setup is the supported integrated development path be
 Important points:
 
 - Originals are private and never exposed through Nginx.
-- Public playback uses expiring signed paths.
+- Internal playback authorization uses a distinct service key, and signed paths are not subscriber-scoped by themselves.
 - Admin actions require a separate API key.
 - Do not commit `.env`.
 - Rate-limit and firewall upload routes before public use.
