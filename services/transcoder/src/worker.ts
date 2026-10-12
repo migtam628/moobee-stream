@@ -1,6 +1,6 @@
 import path from 'node:path';
 import pg from 'pg';
-import IORedis from 'ioredis';
+import { Redis } from 'ioredis';
 import { Worker, type Job } from 'bullmq';
 import { extractPoster, probeVideo, transcodeToHls } from './media.js';
 
@@ -11,7 +11,7 @@ if (!databaseUrl || !redisUrl) throw new Error('DATABASE_URL and REDIS_URL are r
 
 const { Pool } = pg;
 const db = new Pool({ connectionString: databaseUrl });
-const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
+const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 
 type Video = { id: string; source_path: string };
 
